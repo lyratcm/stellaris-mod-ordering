@@ -9,6 +9,7 @@ import time
 from multiprocessing import Process
 import threading
 import json5
+import zipfile
 
 
 #needs to be tracked in multiple functions trigger by buttons so not return
@@ -68,16 +69,6 @@ def mod_filtering_func():
     #make the position match the order in the list
     for i in range(len(main_list)):
         main_list[i][2] = i+1
-    # print(main_list)
-    # connection_link.execute('DELETE FROM sortingDB')
-    # connection_link.commit()
-    # for mod in main_list:
-    #     displayName = mod[0]
-    #     enabled = mod[1]
-    #     position = mod[2]
-    #     steamId = mod[3]
-    #     connection_link.execute("INSERT INTO sortingDB (displayName, enabled, position, steamId) VALUES (?, ?, ?, ?)", (displayName, enabled, position, steamId))
-    # connection_link.commit()
 
 
 def mod_ordering_func():
@@ -117,13 +108,15 @@ def mod_ordering_func():
     # mod_filtering_process = Process(target=mod_filtering_func)
     mod_filtering_process = threading.Thread(target=mod_filtering_func)
 
+def replace_text(text, replace:list, replace_to:str = ""):
+    for ch in replace:
+        if ch in text:
+            text = text.replace(ch,replace_to )
+    return text
 
 
-def strip_useful_mod_info(data_location):
+def strip_useful_mod_info(data_location:str):
     lowest_prio = 100000
-
-    # connection_link.execute("DELETE FROM sortingDB")
-    # connection_link.commit()
     global sorted_list
     global load_order_loc
     sorted_list = []
@@ -132,8 +125,7 @@ def strip_useful_mod_info(data_location):
     else:
         load_order_loc = "C:\\Users\\dan20\\OneDrive\\stellaris mod ordering\\op(for testing code)_backup.json"
     file_location = open(load_order_loc, "r+")
-    meta_data_location = []
-    meta_data = {}
+    meta_data_location = [{"name":[],"supported_version":[],"path":[]}]
     for mod_strip in file_location:
         # add a - between each of the dicts so they can be split on without removing the {} which no longer leaves them in a dict format to be converted
         mod_strip = mod_strip.replace("},{", "},-{")
@@ -147,113 +139,70 @@ def strip_useful_mod_info(data_location):
         for file in os.listdir(mod_folder):
             descriptor_file = os.path.join(mod_folder, file)
             if os.path.isfile(descriptor_file):
-                for descriptor in open(descriptor_file, "r+", encoding='UTF-8'):
-                    # meta_data_location.append(descriptor)
-                    if descriptor.startswith("name="):
-                        meta_data_location.append({"name":f"{(descriptor[5:].replace('"', "")).replace("\n","")}"})
-                    if descriptor.startswith("supported_version="):
-                        meta_data_location[-1]["supported_version"] = (descriptor[18:].replace('"', "")).replace("\n","")
-                    if descriptor.startswith("path="):
-                        meta_data_location[-1]["path"] = ((descriptor[5:].replace('"', "")).replace("\n","")).replace("_-_"," - ")
-                if "path" not in meta_data_location[-1]:
-                    meta_data_location[-1]["path"] = ""
-                    # meta_data_location[-1]["path"] = meta_data_location[-1]["path"].replace("/", "\\\\")
-                if "supported_version" not in meta_data_location[-1]:
-                    meta_data_location[-1]["supported_version"] = ""
-                if "name" not in meta_data_location[-1]:
-                    meta_data_location[-1]["name"] = ""
-                # print(f"{meta_data_location[-1]["path"]}")
-                if Path(os.path.join(meta_data_location[-1]["path"], "meta_data.json5")).is_file():
-                    meta = open(os.path.join(meta_data_location[-1]["path"], "meta_data.json5"), "r", encoding='UTF-8').read()
-                    meta_data = json5.loads(meta)
-                    for key in meta_data:
-                        meta_data[key] = meta_data[key][1:-2]
-                    meta_data_location[-1] = meta_data_location[-1] | meta_data
-                    # for mod_info in open(os.path.join(meta_data_location[-1]["path"], "descriptor.mod"), "r", encoding='UTF-8'):
-                    #     if mod_info.startswith("name="):
-                    #         mod_info = mod_info[5:-2]
-                    #         meta_data["name"] = mod_info
-                    # print(meta_data)
-                    #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
-                    if "exclusive_with" not in meta_data:
-                        meta_data_location[-1]["exclusive_with"] = [ lowest_prio, "", "" ]
-                    if "dependency" not in meta_data:
-                        meta_data_location[-1]["dependency"] = [ lowest_prio, "", "" ]
-                    if "priority" not in meta_data:
-                        meta_data_location[-1]["priority"] = [ lowest_prio, "" ]
-                    if "load_after" not in meta_data:
-                        meta_data_location[-1]["load_after"] = lowest_prio
-                    if "load_before" not in meta_data:
-                        meta_data_location[-1]["load_before"] = lowest_prio
-                    # print(mod_info["dependency"])
+                for desc_line in open(descriptor_file, "r+", encoding='UTF-8'):
+                    if desc_line.startswith("name="):
+                        if "name" in meta_data_location[-1].keys():
+                            meta_data_location.append({"name":[replace_text(desc_line, ['"',"\n","name="])]})
+                        else:
+                            meta_data_location[-1]["name"] = [replace_text(desc_line, ['"',"\n","name="])]
+                    if desc_line.startswith("supported_version="):
+                        if "supported_version" in meta_data_location[-1].keys():
+                            meta_data_location.append({"name":[replace_text(desc_line, ['"',"\n","supported_version="])]})
+                        else:
+                            meta_data_location[-1]["supported_version"] = [replace_text(desc_line, ['"',"\n","supported_version="])]
+                    if desc_line.startswith("path=") or desc_line.startswith("archive="):
+                        if "path" in meta_data_location[-1].keys() or "archive" in meta_data_location[-1].keys():
+                            meta_data_location.append({"name":[replace_text(replace_text(desc_line, ['"',"\n","path=","archive="]),["_-_"]," - ")]})
+                        else:
+                            meta_data_location[-1]["path"] = [replace_text(replace_text(desc_line, ['"',"\n","path=","archive="]),["_-_"]," - ")]
+                if "path" not in meta_data_location[-1].keys():
+                    meta_data_location[-1]["path"] = [""]
+                if "supported_version" not in meta_data_location[-1].keys():
+                    meta_data_location[-1]["supported_version"] = [""]
+                if "name" not in meta_data_location[-1].keys():
+                    meta_data_location[-1]["name"] = [""]
+                if Path(os.path.join(meta_data_location[-1]["path"][0], "meta_data.json5")).is_file() or Path(meta_data_location[-1]["path"][0]).is_file():
+                    #handeling for mods being stored as a zip
+                    if Path(meta_data_location[-1]["path"][0]).is_file():
+                        archive = zipfile.ZipFile(meta_data_location[-1]["path"][0], 'r')
+                        if any(x.startswith("%s/" % "meta_data.json5".rstrip("/")) for x in archive.namelist()):
+                            meta = archive.read("meta_data.json5")
+                            meta_data = json5.loads(str(meta))
+                            meta_data_location[-1] = meta_data_location[-1] | meta_data
+                            #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
+                            if "exclusive_with" not in meta_data:
+                                meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "" ]]
+                            if "dependency" not in meta_data:
+                                meta_data_location[-1]["dependency"] = [[ lowest_prio, "", "" ]]
+                            if "priority" not in meta_data:
+                                meta_data_location[-1]["priority"] = [[ lowest_prio, "" ]]
+                            if "load_after" not in meta_data:
+                                meta_data_location[-1]["load_after"] = [lowest_prio]
+                            if "load_before" not in meta_data:
+                                meta_data_location[-1]["load_before"] = [lowest_prio]
+                    else:
+                        meta = open(os.path.join(meta_data_location[-1]["path"][0], "meta_data.json5"), "r", encoding='UTF-8').read()
+                        meta_data = json5.loads(meta)
+                        meta_data_location[-1] = meta_data_location[-1] | meta_data
+                        #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
+                        if "exclusive_with" not in meta_data:
+                            meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "" ]]
+                        if "dependency" not in meta_data:
+                            meta_data_location[-1]["dependency"] = [[ lowest_prio, "", "" ]]
+                        if "priority" not in meta_data:
+                            meta_data_location[-1]["priority"] = [[ lowest_prio, "" ]]
+                        if "load_after" not in meta_data:
+                            meta_data_location[-1]["load_after"] = [lowest_prio]
+                        if "load_before" not in meta_data:
+                            meta_data_location[-1]["load_before"] = [lowest_prio]
                 else:
-                    # for mod_info in open(os.path.join(mod_data_location["path"], "descriptor.mod"), "r", encoding='UTF-8'):
-                    #     if mod_info.startswith("name="):
-                    #         mod_info = mod_info[5:-2]
-                    #         meta_data["name"] = mod_info
-                    meta_data_location[-1]["priority"] = [ lowest_prio, "" ]
-                    meta_data_location[-1]["dependency"] = [ lowest_prio, "", "" ]
-                    meta_data_location[-1]["exclusive_with"] = [ lowest_prio, "", "" ]
-                    meta_data_location[-1]["load_after"] = lowest_prio
-                    meta_data_location[-1]["load_before"] = lowest_prio
-
-            # print(meta_data_location)
-        # for mod_data_location in meta_data_location:
-        #     # find the mod file use it to locate the mod folder, find the meta_data and extract the info to be used later for ordering
-        #     # error handling incase someone is sorting for mods they don't have
-        #     # print(f"{mod_data_location["path"]}/meta_data.json5")
-        #     if Path(os.path.join(mod_data_location["path"], "meta_data.json5")).is_file():
-        #         meta = open(os.path.join(mod_data_location["path"], "meta_data.json5"), "r", encoding='UTF-8').read()
-        #         meta_data = json5.loads(meta)
-        #         for mod_info in open(os.path.join(mod_data_location["path"], "descriptor.mod"), "r", encoding='UTF-8'):
-        #             if mod_info.startswith("name="):
-        #                 mod_info = mod_info[5:-2]
-        #                 meta_data["name"] = mod_info
-        #         # print(meta_data)
-        #         #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
-        #         if "exclusive_with" not in meta_data:
-        #             meta_data["exclusive_with"] = [ lowest_prio, "", "" ]
-        #         if "dependency" not in meta_data:
-        #             meta_data["dependency"] = [ lowest_prio, "", "" ]
-        #         if "priority" not in meta_data:
-        #             meta_data["priority"] = [ lowest_prio, "" ]
-        #         if "load_after" not in meta_data:
-        #             meta_data["load_after"] = lowest_prio
-        #         if "load_before" not in meta_data:
-        #             meta_data["load_before"] = lowest_prio
-        #         # print(mod_info["dependency"])
-        #     else:
-        #         # for mod_info in open(os.path.join(mod_data_location["path"], "descriptor.mod"), "r", encoding='UTF-8'):
-        #         #     if mod_info.startswith("name="):
-        #         #         mod_info = mod_info[5:-2]
-        #         #         meta_data["name"] = mod_info
-        #         # meta_data["name"] =
-        #         meta_data["priority"] = [ lowest_prio, "" ]
-        #         meta_data["dependency"] = [ lowest_prio, "", "" ]
-        #         meta_data["exclusive_with"] = [ lowest_prio, "", "" ]
-        #         meta_data["load_after"] = lowest_prio
-        #         meta_data["load_before"] = lowest_prio
-        #     # for data in meta_data_location:
-        #     #     if data["name"] == meta_data["name"]:
-        #     #         meta_data["supported_version"] = data["supported_version"]
-        #     #         meta_data["path"] = data["path"]
-        #     #get list of names, then iterate over those names. 1 iteration for finding them then an iteration per dict
-        #     # meta_data_out = []
-        #     # meta_data.extend(meta_data_location)
-        #     # for myDict in meta_data:
-        #     #     if myDict not in meta_data_out:
-        #     #         meta_data_out.append(myDict)
-        #
-        #     # meta_data["supported_version"] = (meta_data["name"] in meta_data_location) == True
-        #     # meta_data["supported_version"] = meta_data_location[meta_data_location.index()][["supported_version"]]
-        #     sorted_list.append(meta_data)
-        #     # print(meta_data)
-    meta_info = []
-    for meta_data in meta_data_location:
-        if meta_data["path"] == "C:/Users/dan20/Documents/Paradox Interactive/Stellaris/mod/megacorp metamod":
-            meta_info.append(meta_data)
-    # print(meta_data_location)
-    print(meta_info)
+                    meta_data_location[-1]["priority"] = [[ lowest_prio, "" ]]
+                    meta_data_location[-1]["dependency"] = [[ lowest_prio, "", "" ]]
+                    meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "" ]]
+                    meta_data_location[-1]["load_after"] = [lowest_prio]
+                    meta_data_location[-1]["load_before"] = [lowest_prio]
+    del(meta_data_location[0])
+    print(meta_data_location)
 
 
 def output_mod_list():
