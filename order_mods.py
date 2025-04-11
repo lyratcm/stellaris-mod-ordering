@@ -1,3 +1,4 @@
+import ast
 import os.path
 import re
 import tkinter as tk
@@ -18,7 +19,7 @@ dependencies = []
 dependencies_tracker = 0
 exclusive_tracker = 0
 mod_filtering_process = Process()
-sorted_list = []
+meta_data_location = []
 exclusive = []
 
 def create_table():
@@ -30,7 +31,7 @@ def mod_filtering_func():
     #recrate the conn link as tkinter doesn't allow it to be passed through
     dab_name = 'mod sorting.db'
     connection_link = sqlite3.connect(dab_name)
-    global sorted_list
+    global meta_data_location
     global exclusive
     last_list = []
     # print(f"sorted: {sorted_list}")
@@ -39,7 +40,7 @@ def mod_filtering_func():
     priority_order = []
     patch_list = []
     main_list = []
-    for char in sorted_list:
+    for char in meta_data_location:
         if char['priority'][0] != 100000:
             priority_order.append(char)
         else:
@@ -50,11 +51,7 @@ def mod_filtering_func():
             if not any(value in char['displayName'] for value in last_load_letters) and not any(value in char['displayName'] for value in patch_mod_letters):
                 main_list.append(char)
     priority_order = sorted(priority_order, key=lambda s: s['priority'][0])
-    # print(f"priority: {priority_order}")
     #take out the mods that should be last, that are patches and all other mods to order them
-    # last_list = [char for char in sorted_list ]
-    # patch_list = [char for char in sorted_list ]
-    # main_list = [char for char in sorted_list ]
     main_list.sort(key = lambda x: x['displayName'], reverse=True)
     patch_list.sort(key = lambda x: x['displayName'],reverse=True)
     for i in range(len(patch_list)):
@@ -69,39 +66,60 @@ def mod_filtering_func():
     #make the position match the order in the list
     for i in range(len(main_list)):
         main_list[i][2] = i+1
+    print(main_list)
 
 
 def mod_ordering_func():
-    global sorted_list
+    global meta_data_location
+    # print(meta_data_location)
     global dependencies
     dependencies = []
     global exclusive
     exclusive_temp = []
     #grab a list of all dependency's
-    for char in sorted_list:
-        if char['dependency'][0] != 100000 and (char['dependency'][0] != ""):
-            dependencies.append(json.loads(char['dependency']))
-        if (char['exclusive_with'][0] != 100000) and (char['exclusive_with'][0] != "") and (char['exclusive_with'][0] != "*"):
-            exclusive.append(json.loads(char['exclusive_with']))
-        elif (char['exclusive_with'][0] != 100000) and (char['exclusive_with'][0] != ""):
-            exclusive.append(json.loads(char['exclusive_with']))
-            if exclusive[-1][2] != "":
-                #move the mod name to the name field to treat the mod like a self overwrite
-                exclusive[-1][0] = exclusive[-1][2]
-    #try to find the mod name in the mod list so the dependency is fill and remove it from the list
-    for char in sorted_list:
-        if [0] in dependencies:
-            dependencies.remove(json.loads(char[4]))
-        if [0] in exclusive:
-            exclusive_temp.append(json.loads(char[5]))
-    exclusive = exclusive_temp
+    for dicts in meta_data_location:
+        try:
+            if dicts['dependency'][0][0] != 100000 and (dicts['dependency'][0][0] != ""):
+                # dependencies.append(dicts['dependency'])
+                for meta in dicts['dependency']:
+                    dependencies.append(meta)
+            if (dicts['exclusive_with'][0][0] != 100000) and (dicts['exclusive_with'][0][0] != ""):
+                for meta in dicts['exclusive_with']:
+                    exclusive.append(meta)
+                # print(dicts['exclusive_with'])
+            # elif (dicts['exclusive_with'][0][0] != 100000) and (dicts['exclusive_with'][0][0] != ""):
+            #     exclusive.append(dicts['exclusive_with'])
+            #     print(dicts['exclusive_with'])
+            #     if exclusive[-1][0][2] != "":
+            #         #move the mod name to the name field to treat the mod like a self overwrite
+            #         exclusive[-1][0][0] = exclusive[-1][0][2]
+            elif 'exclusive_with' in dicts and dicts['exclusive_with'][0][0] != 100000:
+                #fall back to catch missed metadata
+                print(dicts['exclusive_with'])
+        except KeyError:
+            print(dicts)
     # print(dependencies)
+    #try to find the mod name in the mod list so the dependency is fill and remove it from the list
+    # print(meta_data_location)
+    for char in meta_data_location:
+        for dependant in dependencies:
+            if char["name"][0] == dependant[0]:
+                # print(f"{dependant}, {char["name"]}")
+                dependencies.remove(dependant)
+            if char["name"][0] in dependant[0]:
+                exclusive_temp.append(dependant)
+    exclusive = exclusive_temp
+    # print(exclusive_temp)
     global dependencies_tracker
     dependencies_tracker = len(dependencies)
     global exclusive_tracker
     exclusive_tracker = len(exclusive)
     #opens an ui to
-    missing_mod_lbl.config(text=f"Mod {dependencies[-dependencies_tracker][0]} is missing  but is required by a mod in the play set because \n {dependencies[-dependencies_tracker][2]}")
+    print(exclusive)
+    try:
+        missing_mod_lbl.config(text=f"Mod {dependencies[-dependencies_tracker][0]} is missing but is required by a mod in the play set because \n {dependencies[-dependencies_tracker][2]}")
+    except IndexError:
+        print(dependencies)
     reuq_action_tbl.deiconify()
     main_menu_tbl.withdraw()
     global mod_filtering_process
@@ -117,9 +135,10 @@ def replace_text(text, replace:list, replace_to:str = ""):
 
 def strip_useful_mod_info(data_location:str):
     lowest_prio = 100000
-    global sorted_list
+    global meta_data_location
     global load_order_loc
-    sorted_list = []
+    meta_data_location = []
+    mod_names = []
     if data_location != "":
         load_order_loc = data_location
     else:
@@ -133,12 +152,19 @@ def strip_useful_mod_info(data_location:str):
         # remove some of the start and end of file info
         mod_strip[0] = mod_strip[0][28:]
         mod_strip[-1] = mod_strip[-1][0:-14]
+        for jsons in range(len(mod_strip)):
+            mod_strip[jsons] = json.loads(mod_strip[jsons])
+        # print(mod_strip)
+        for mod_name in mod_strip:
+            mod_names.append(mod_name["displayName"])
+        # print(mod_names)
         mod_folder = Path(os.path.expanduser(f"~\\Documents\\Paradox Interactive\\Stellaris\\mod"))
         # iterate through the mod folder open every file (not folder) all should be mod files
         # extract the mod name, supported version (for future stuff) and file location which can be used to grab mods metadata
         for file in os.listdir(mod_folder):
             descriptor_file = os.path.join(mod_folder, file)
             if os.path.isfile(descriptor_file):
+            # if any(value[5:-2] in mod_names for value in open(descriptor_file, "r+", encoding='UTF-8').read()):
                 for desc_line in open(descriptor_file, "r+", encoding='UTF-8'):
                     if desc_line.startswith("name="):
                         if "name" in meta_data_location[-1].keys():
@@ -152,7 +178,7 @@ def strip_useful_mod_info(data_location:str):
                             meta_data_location[-1]["supported_version"] = [replace_text(desc_line, ['"',"\n","supported_version="])]
                     if desc_line.startswith("path=") or desc_line.startswith("archive="):
                         if "path" in meta_data_location[-1].keys() or "archive" in meta_data_location[-1].keys():
-                            meta_data_location.append({"name":[replace_text(replace_text(desc_line, ['"',"\n","path=","archive="]),["_-_"]," - ")]})
+                            meta_data_location.append({"path":[replace_text(replace_text(desc_line, ['"',"\n","path=","archive="]),["_-_"]," - ")]})
                         else:
                             meta_data_location[-1]["path"] = [replace_text(replace_text(desc_line, ['"',"\n","path=","archive="]),["_-_"]," - ")]
                 if "path" not in meta_data_location[-1].keys():
@@ -161,17 +187,44 @@ def strip_useful_mod_info(data_location:str):
                     meta_data_location[-1]["supported_version"] = [""]
                 if "name" not in meta_data_location[-1].keys():
                     meta_data_location[-1]["name"] = [""]
-                if Path(os.path.join(meta_data_location[-1]["path"][0], "meta_data.json5")).is_file() or Path(meta_data_location[-1]["path"][0]).is_file():
-                    #handeling for mods being stored as a zip
-                    if Path(meta_data_location[-1]["path"][0]).is_file():
-                        archive = zipfile.ZipFile(meta_data_location[-1]["path"][0], 'r')
-                        if any(x.startswith("%s/" % "meta_data.json5".rstrip("/")) for x in archive.namelist()):
-                            meta = archive.read("meta_data.json5")
-                            meta_data = json5.loads(str(meta))
+                # print(f"{type(meta_data_location[-1]["name"][0])}{type(mod_names[0])}")
+                if meta_data_location[-1]["name"][0] not in mod_names:
+                    del meta_data_location[-1]
+                else:
+                    # if there is a metadata file or there is a zip (which indicates that there's a zipped mod)
+                    if Path(os.path.join(meta_data_location[-1]["path"][0], "meta_data.json5")).is_file() or Path(meta_data_location[-1]["path"][0]).is_file():
+                        #handeling for mods being stored as a zip
+                        # iterate through the zip find the metadata if it exsists else use fall back values
+                        if Path(meta_data_location[-1]["path"][0]).is_file():
+                            archive = zipfile.ZipFile(meta_data_location[-1]["path"][0], 'r')
+                            if any(x.startswith("%s/" % "meta_data.json5".rstrip("/")) for x in archive.namelist()):
+                                meta = archive.read("meta_data.json5")
+                                meta_data = json5.loads(str(meta))
+                                meta_data_location[-1] = meta_data_location[-1] | meta_data
+                                #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
+                                if "exclusive_with" not in meta_data:
+                                    meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "", 0]]
+                                if "dependency" not in meta_data:
+                                    meta_data_location[-1]["dependency"] = [[ lowest_prio, "", "" ]]
+                                if "priority" not in meta_data:
+                                    meta_data_location[-1]["priority"] = [[ lowest_prio, "" ]]
+                                if "load_after" not in meta_data:
+                                    meta_data_location[-1]["load_after"] = [lowest_prio]
+                                if "load_before" not in meta_data:
+                                    meta_data_location[-1]["load_before"] = [lowest_prio]
+                            else:
+                                meta_data_location[-1]["priority"] = [[ lowest_prio, "" ]]
+                                meta_data_location[-1]["dependency"] = [[ lowest_prio, "", "" ]]
+                                meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "", 0 ]]
+                                meta_data_location[-1]["load_after"] = [lowest_prio]
+                                meta_data_location[-1]["load_before"] = [lowest_prio]
+                        else:
+                            meta = open(os.path.join(meta_data_location[-1]["path"][0], "meta_data.json5"), "r", encoding='UTF-8').read()
+                            meta_data = json5.loads(meta)
                             meta_data_location[-1] = meta_data_location[-1] | meta_data
                             #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
                             if "exclusive_with" not in meta_data:
-                                meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "" ]]
+                                meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "", 0]]
                             if "dependency" not in meta_data:
                                 meta_data_location[-1]["dependency"] = [[ lowest_prio, "", "" ]]
                             if "priority" not in meta_data:
@@ -181,28 +234,21 @@ def strip_useful_mod_info(data_location:str):
                             if "load_before" not in meta_data:
                                 meta_data_location[-1]["load_before"] = [lowest_prio]
                     else:
-                        meta = open(os.path.join(meta_data_location[-1]["path"][0], "meta_data.json5"), "r", encoding='UTF-8').read()
-                        meta_data = json5.loads(meta)
-                        meta_data_location[-1] = meta_data_location[-1] | meta_data
-                        #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
-                        if "exclusive_with" not in meta_data:
-                            meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "" ]]
-                        if "dependency" not in meta_data:
-                            meta_data_location[-1]["dependency"] = [[ lowest_prio, "", "" ]]
-                        if "priority" not in meta_data:
-                            meta_data_location[-1]["priority"] = [[ lowest_prio, "" ]]
-                        if "load_after" not in meta_data:
-                            meta_data_location[-1]["load_after"] = [lowest_prio]
-                        if "load_before" not in meta_data:
-                            meta_data_location[-1]["load_before"] = [lowest_prio]
-                else:
-                    meta_data_location[-1]["priority"] = [[ lowest_prio, "" ]]
-                    meta_data_location[-1]["dependency"] = [[ lowest_prio, "", "" ]]
-                    meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "" ]]
-                    meta_data_location[-1]["load_after"] = [lowest_prio]
-                    meta_data_location[-1]["load_before"] = [lowest_prio]
+                        meta_data_location[-1]["priority"] = [[ lowest_prio, "" ]]
+                        meta_data_location[-1]["dependency"] = [[ lowest_prio, "", "" ]]
+                        meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "", 0]]
+                        meta_data_location[-1]["load_after"] = [lowest_prio]
+                        meta_data_location[-1]["load_before"] = [lowest_prio]
     del(meta_data_location[0])
-    print(meta_data_location)
+    # tracker = 0
+    # for meta_data in range(len(meta_data_location)):
+    #     if meta_data_location[meta_data-tracker]["name"][0] not in mod_names:
+    #         # print(meta_data_location[meta_data-tracker]["name"])
+    #         del meta_data_location[meta_data-tracker]
+    #         tracker +=1
+    # print(meta_data_location)
+
+
 
 
 def output_mod_list():
@@ -232,14 +278,14 @@ def close_link_ui():
     global dependencies
     global exclusive_tracker
     global exclusive
-    global sorted_list
+    global meta_data_location
     if dependencies_tracker != 0:
         webbrowser.open(f"{dependencies[-dependencies_tracker][1]}", autoraise=True)
         # print("browser open")
         dependencies_tracker -= 1
     elif exclusive_tracker != 0:
         if exclusive[-exclusive_tracker][0] != "*":
-            del sorted_list[exclusive[-exclusive_tracker]]
+            del meta_data_location[exclusive[-exclusive_tracker]]
         exclusive_tracker -= 1
     if dependencies_tracker != 0:
         missing_mod_lbl.config(text=f"Mod {dependencies[-dependencies_tracker][0]} is missing but is required by a mod in the play set because {dependencies[-dependencies_tracker][2]}")
