@@ -40,29 +40,50 @@ def mod_filtering_func():
     priority_order = []
     patch_list = []
     main_list = []
+    patching_needed_before = []
+    patching_needed_after = []
     for char in meta_data_location:
+        # prio of 100000 means that no prio has been defined so use fallback ordering
         if char['priority'][0] != 100000:
             priority_order.append(char)
         else:
-            if any(value in char['displayName'] for value in last_load_letters):
+            if any(value in char['name'] for value in last_load_letters):
                 last_list.append(char)
-            if any(value in char['displayName'] for value in patch_mod_letters) and not any(value in char['displayName'] for value in last_load_letters):
+            if any(value in char['name'] for value in patch_mod_letters) and not any(value in char['name'] for value in last_load_letters):
                 patch_list.append(char)
-            if not any(value in char['displayName'] for value in last_load_letters) and not any(value in char['displayName'] for value in patch_mod_letters):
+            if not any(value in char['name'] for value in last_load_letters) and not any(value in char['name'] for value in patch_mod_letters):
                 main_list.append(char)
+        if char['load_before'][0] != 100000:
+            patching_needed_before.append([char['load_before'][0], char['name'], meta_data_location.index(char)])
+        if char['load_after'][0] != 100000:
+            patching_needed_after.append([char['load_after'][0], char['name'], meta_data_location.index(char)])
     priority_order = sorted(priority_order, key=lambda s: s['priority'][0])
     #take out the mods that should be last, that are patches and all other mods to order them
-    main_list.sort(key = lambda x: x['displayName'], reverse=True)
-    patch_list.sort(key = lambda x: x['displayName'],reverse=True)
+    main_list.sort(key = lambda x: x['name'], reverse=True)
+    patch_list.sort(key = lambda x: x['name'],reverse=True)
     for i in range(len(patch_list)):
         main_list.append(patch_list[i])
     # sort based on ! due to stellaris loading
-    last_list = sorted(last_list, key=lambda s: s['displayName'].count('!'))
+    last_list = sorted(last_list, key=lambda s: s['name'].count('!'))
     for i in range(len(last_list)):
         main_list.append(last_list[i])
     for i in range(len(main_list)):
         priority_order.append(main_list[i])
-
+    print(meta_data_location)
+    #0 is mod to change 1 is mod name with the metadata 2 is index of the mod with the metadata
+    # prio 0 is loaded last prio 100000 is loaded first
+    for patch in patching_needed_before:
+        if priority_order.index(patch[0]) < patch[2]:
+            old_index = priority_order.index(patch[0])
+            priority_order.insert(priority_order[priority_order.index(patch[0])], priority_order.index(patch[2]))
+            del priority_order[old_index]
+        # no need to take action if prio is higher as it will already be loaded before
+    for patch in patching_needed_after:
+        if priority_order.index(patch[0]) > patch[2]:
+            old_index = priority_order.index(patch[0])
+            priority_order.insert(priority_order[priority_order.index(patch[0])], priority_order.index(patch[2]))
+            del priority_order[old_index]
+    # no need to take action if prio is lower as it will already be loaded after
     #make the position match the order in the list
     for i in range(len(main_list)):
         main_list[i][2] = i+1
@@ -71,7 +92,6 @@ def mod_filtering_func():
 
 def mod_ordering_func():
     global meta_data_location
-    # print(meta_data_location)
     global dependencies
     dependencies = []
     global exclusive
@@ -80,27 +100,18 @@ def mod_ordering_func():
     for dicts in meta_data_location:
         try:
             if dicts['dependency'][0][0] != 100000 and (dicts['dependency'][0][0] != ""):
-                # dependencies.append(dicts['dependency'])
                 for meta in dicts['dependency']:
                     dependencies.append(meta)
             if (dicts['exclusive_with'][0][0] != 100000) and (dicts['exclusive_with'][0][0] != ""):
                 for meta in dicts['exclusive_with']:
                     exclusive.append(meta)
                 # print(dicts['exclusive_with'])
-            # elif (dicts['exclusive_with'][0][0] != 100000) and (dicts['exclusive_with'][0][0] != ""):
-            #     exclusive.append(dicts['exclusive_with'])
-            #     print(dicts['exclusive_with'])
-            #     if exclusive[-1][0][2] != "":
-            #         #move the mod name to the name field to treat the mod like a self overwrite
-            #         exclusive[-1][0][0] = exclusive[-1][0][2]
             elif 'exclusive_with' in dicts and dicts['exclusive_with'][0][0] != 100000:
                 #fall back to catch missed metadata
                 print(dicts['exclusive_with'])
         except KeyError:
             print(dicts)
-    # print(dependencies)
     #try to find the mod name in the mod list so the dependency is fill and remove it from the list
-
     for char in meta_data_location:
         for dependant in dependencies:
             if char["name"][0] == dependant[0]:
