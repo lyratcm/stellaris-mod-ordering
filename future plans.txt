@@ -1,8 +1,8 @@
-add opening the link in steam
+add opening the link in steam app
 support for linux/mac os
 add windows explorer ui to pick mod and button to pull active playset
 turn the global variables into local ones
-ui made in vs
+ui made in vs/ better ui
 modder ui to create metamod
 change mod filtering to use metadata rather than mod name (the internal one should more rarely change )
 add support loading last used playlist from pdx launcher/irony

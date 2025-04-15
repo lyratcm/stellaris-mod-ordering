@@ -100,7 +100,7 @@ def mod_ordering_func():
             print(dicts)
     # print(dependencies)
     #try to find the mod name in the mod list so the dependency is fill and remove it from the list
-    # print(meta_data_location)
+
     for char in meta_data_location:
         for dependant in dependencies:
             if char["name"][0] == dependant[0]:
@@ -114,17 +114,21 @@ def mod_ordering_func():
     dependencies_tracker = len(dependencies)
     global exclusive_tracker
     exclusive_tracker = len(exclusive)
+    # meta_mod_name = []
+    # for mod_name in meta_data_location:
+    #     meta_mod_name.append(mod_name["name"][0])
     #opens an ui to
-    print(exclusive)
     try:
         missing_mod_lbl.config(text=f"Mod {dependencies[-dependencies_tracker][0]} is missing but is required by a mod in the play set because \n {dependencies[-dependencies_tracker][2]}")
     except IndexError:
         print(dependencies)
+    #fix not all the missing dependents/exclusives being shown
     reuq_action_tbl.deiconify()
     main_menu_tbl.withdraw()
     global mod_filtering_process
     # mod_filtering_process = Process(target=mod_filtering_func)
     mod_filtering_process = threading.Thread(target=mod_filtering_func)
+
 
 def replace_text(text, replace:list, replace_to:str = ""):
     for ch in replace:
@@ -249,8 +253,6 @@ def strip_useful_mod_info(data_location:str):
     # print(meta_data_location)
 
 
-
-
 def output_mod_list():
     output_mod_file_loc = export_data_txtb.get()
     if output_mod_file_loc == '':
@@ -272,6 +274,7 @@ def output_mod_list():
     load_order_file.write(output_mod_file)
 
 
+# add ui to show dependency to download, show a single link then have button to show next increasing counter global
 def close_link_ui():
     global dependencies_tracker
     global mod_filtering_process
@@ -285,26 +288,49 @@ def close_link_ui():
         dependencies_tracker -= 1
     elif exclusive_tracker != 0:
         if exclusive[-exclusive_tracker][0] != "*":
-            del meta_data_location[exclusive[-exclusive_tracker]]
+            for meta_data in meta_data_location:
+                if meta_data["name"][0] == exclusive[-exclusive_tracker][0]:
+                    del meta_data_location[meta_data_location.index(meta_data)]
         exclusive_tracker -= 1
     if dependencies_tracker != 0:
         missing_mod_lbl.config(text=f"Mod {dependencies[-dependencies_tracker][0]} is missing but is required by a mod in the play set because {dependencies[-dependencies_tracker][2]}")
-        reuq_action_tbl.deiconify()
-        reuq_action_tbl.iconify()
     elif exclusive_tracker != 0:
         missing_mod_lbl.config(text=f"Mod {exclusive[-exclusive_tracker][0]} is incompatible with a mod in the play set because {exclusive[-exclusive_tracker][1]}")
-        reuq_action_tbl.deiconify()
-        reuq_action_tbl.iconify()
+        sub_to_mod_btn.config(text="Remove mod from playset")
     else:
         reuq_action_tbl.withdraw()
         main_menu_tbl.deiconify()
         mod_filtering_process.start()
         # print(sorted_list)
 
+
+# add ui to show dependency to download, show a single link then have button to show next increasing counter global
 def skip_link_ui():
-    reuq_action_tbl.withdraw()
-    main_menu_tbl.deiconify()
-    mod_filtering_process.start()
+    global dependencies_tracker
+    global mod_filtering_process
+    global dependencies
+    global exclusive_tracker
+    global exclusive
+    global meta_data_location
+    if dependencies_tracker != 0:
+        # print("browser open")
+        dependencies_tracker -= 1
+    elif exclusive_tracker != 0:
+        exclusive_tracker -= 1
+    if dependencies_tracker != 0:
+        missing_mod_lbl.config(text=f"Mod {dependencies[-dependencies_tracker][0]} is missing but is required by a mod in the play set because {dependencies[-dependencies_tracker][2]}")
+        # reuq_action_tbl.deiconify()
+        # reuq_action_tbl.iconify()
+    elif exclusive_tracker != 0:
+        missing_mod_lbl.config(text=f"Mod {exclusive[-exclusive_tracker][0]} is incompatible with a mod in the play set because {exclusive[-exclusive_tracker][1]}")
+        sub_to_mod_btn.config(text="Remove mod from playset")
+        # reuq_action_tbl.deiconify()
+        # reuq_action_tbl.iconify()
+    else:
+        reuq_action_tbl.withdraw()
+        main_menu_tbl.deiconify()
+        mod_filtering_process.start()
+
 
 if "__main__" == __name__:
     dab_name = 'mod sorting.db'
@@ -351,4 +377,3 @@ if "__main__" == __name__:
     main_menu_tbl.mainloop() #run form by default
 
 
-# add ui to show dependency to download, show a single link then have button to show next incrating counter global
