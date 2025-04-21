@@ -11,6 +11,7 @@ from multiprocessing import Process
 import threading
 import json5
 import zipfile
+from collections import defaultdict
 
 
 #needs to be tracked in multiple functions trigger by buttons so not return
@@ -24,7 +25,7 @@ exclusive = []
 
 def create_table():
     db_cursor.execute('CREATE TABLE IF NOT EXISTS sortingDB(displayName TEX, enabled INTEGER, position INTEGER, steamId INTEGER PRIMARY KEY, dependency TEX, exclusive_with TEX, priority TEX, load_after TEX, load_before TEX)')
-    # db_cursor.execute('CREATE TABLE IF NOT EXISTS sortingorderDB(idno INTEGER PRIMARY KEY,datestamp TEXT, firstname TEXT, surname TEXT, age INTEGER)')
+    # db_cursor.execute('CREATE TABLE IF NOT EXISTS sortingorderDB(idno INTEGER PRIMARY KEY, datestamp TEXT, firstname TEXT, surname TEXT, age INTEGER)')
 
 
 def mod_filtering_func():
@@ -69,25 +70,31 @@ def mod_filtering_func():
         main_list.append(last_list[i])
     for i in range(len(main_list)):
         priority_order.append(main_list[i])
-    print(meta_data_location)
+    # print(meta_data_location)
     #0 is mod to change 1 is mod name with the metadata 2 is index of the mod with the metadata
-    # prio 0 is loaded last prio 100000 is loaded first
+    # prio 0 is loaded last prio 100,000 is loaded first
     for patch in patching_needed_before:
-        if priority_order.index(patch[0]) < patch[2]:
-            old_index = priority_order.index(patch[0])
-            priority_order.insert(priority_order[priority_order.index(patch[0])], priority_order.index(patch[2]))
-            del priority_order[old_index]
+        for mod in priority_order:
+            if mod["name"] == patch[0] and mod["priority"] < patch[2]:
+                old_index = priority_order.index(mod)
+                priority_order.insert(priority_order[priority_order.index(mod)], priority_order[patch[2]])
+                del priority_order[old_index]
         # no need to take action if prio is higher as it will already be loaded before
     for patch in patching_needed_after:
-        if priority_order.index(patch[0]) > patch[2]:
-            old_index = priority_order.index(patch[0])
-            priority_order.insert(priority_order[priority_order.index(patch[0])], priority_order.index(patch[2]))
-            del priority_order[old_index]
-    # no need to take action if prio is lower as it will already be loaded after
+        for mod in priority_order:
+            if mod["name"] == patch[0] and mod["priority"] > patch[2]:
+                old_index = priority_order.index(mod)
+                priority_order.insert(priority_order[priority_order.index(mod)], priority_order[patch[2]])
+                del priority_order[old_index]
+        # no need to take action if prio is lower as it will already be loaded after
+
     #make the position match the order in the list
-    for i in range(len(main_list)):
-        main_list[i][2] = i+1
-    print(main_list)
+    for i in range(len(priority_order)):
+        try:
+            priority_order[i]["position"][0] = i+1
+        except KeyError:
+            print(priority_order[i])
+    # print(priority_order)
 
 
 def mod_ordering_func():
@@ -128,7 +135,7 @@ def mod_ordering_func():
     # meta_mod_name = []
     # for mod_name in meta_data_location:
     #     meta_mod_name.append(mod_name["name"][0])
-    #opens an ui to
+    #opens ui to
     try:
         missing_mod_lbl.config(text=f"Mod {dependencies[-dependencies_tracker][0]} is missing but is required by a mod in the play set because \n {dependencies[-dependencies_tracker][2]}")
     except IndexError:
@@ -141,14 +148,14 @@ def mod_ordering_func():
     mod_filtering_process = threading.Thread(target=mod_filtering_func)
 
 
-def replace_text(text, replace:list, replace_to:str = ""):
+def replace_text_func(text, replace:list, replace_to:str = ""):
     for ch in replace:
         if ch in text:
             text = text.replace(ch,replace_to )
     return text
 
 
-def strip_useful_mod_info(data_location:str):
+def strip_useful_mod_info_func(data_location:str):
     lowest_prio = 100000
     global meta_data_location
     global load_order_loc
@@ -174,48 +181,76 @@ def strip_useful_mod_info(data_location:str):
             mod_names.append(mod_name["displayName"])
         # print(mod_names)
         mod_folder = Path(os.path.expanduser(f"~\\Documents\\Paradox Interactive\\Stellaris\\mod"))
-        # iterate through the mod folder open every file (not folder) all should be mod files
-        # extract the mod name, supported version (for future stuff) and file location which can be used to grab mods metadata
+        # iterate through the mod folder, open every file (not folder) all should be mod files
+        # extract the mod name, supported version (for future stuff) and file location which can be used to grab the mod metadata
         for file in os.listdir(mod_folder):
             descriptor_file = os.path.join(mod_folder, file)
             if os.path.isfile(descriptor_file):
-            # if any(value[5:-2] in mod_names for value in open(descriptor_file, "r+", encoding='UTF-8').read()):
                 for desc_line in open(descriptor_file, "r+", encoding='UTF-8'):
                     if desc_line.startswith("name="):
                         if "name" in meta_data_location[-1].keys():
-                            meta_data_location.append({"name":[replace_text(desc_line, ['"',"\n","name="])]})
+                            meta_data_location.append({"name":[replace_text_func(desc_line, ['"', "\n", "name="])]})
                         else:
-                            meta_data_location[-1]["name"] = [replace_text(desc_line, ['"',"\n","name="])]
+                            meta_data_location[-1]["name"] = [replace_text_func(desc_line, ['"', "\n", "name="])]
                     if desc_line.startswith("supported_version="):
                         if "supported_version" in meta_data_location[-1].keys():
-                            meta_data_location.append({"name":[replace_text(desc_line, ['"',"\n","supported_version="])]})
+                            meta_data_location.append({"supported_version":[replace_text_func(desc_line, ['"', "\n", "supported_version="])]})
                         else:
-                            meta_data_location[-1]["supported_version"] = [replace_text(desc_line, ['"',"\n","supported_version="])]
+                            meta_data_location[-1]["supported_version"] = [replace_text_func(desc_line, ['"', "\n", "supported_version="])]
                     if desc_line.startswith("path=") or desc_line.startswith("archive="):
                         if "path" in meta_data_location[-1].keys() or "archive" in meta_data_location[-1].keys():
-                            meta_data_location.append({"path":[replace_text(replace_text(desc_line, ['"',"\n","path=","archive="]),["_-_"]," - ")]})
+                            meta_data_location.append({"path":[replace_text_func(replace_text_func(desc_line, ['"', "\n", "path=", "archive="]), ["_-_"], " - ")]})
                         else:
-                            meta_data_location[-1]["path"] = [replace_text(replace_text(desc_line, ['"',"\n","path=","archive="]),["_-_"]," - ")]
+                            meta_data_location[-1]["path"] = [replace_text_func(replace_text_func(desc_line, ['"', "\n", "path=", "archive="]), ["_-_"], " - ")]
+                    if desc_line.startswith("remote_file_id=") or desc_line.startswith("archive="):
+                        if "remote_file_id" in meta_data_location[-1].keys():
+                            meta_data_location.append({"remote_file_id":[replace_text_func(desc_line, ['"', "\n", "remote_file_id="])]})
+                        else:
+                            meta_data_location[-1]["remote_file_id"] = [replace_text_func(desc_line, ['"', "\n", "remote_file_id="])]
                 if "path" not in meta_data_location[-1].keys():
-                    meta_data_location[-1]["path"] = [""]
+                    meta_data_location[-1]["path"] = ["100000"]
                 if "supported_version" not in meta_data_location[-1].keys():
-                    meta_data_location[-1]["supported_version"] = [""]
+                    meta_data_location[-1]["supported_version"] = ["100000"]
                 if "name" not in meta_data_location[-1].keys():
-                    meta_data_location[-1]["name"] = [""]
+                    meta_data_location[-1]["name"] = ["100000"]
+                if "remote_file_id" not in meta_data_location[-1].keys():
+                    meta_data_location[-1]["remote_file_id"] = ["100000"]
+                # print(meta_data_location)
                 # print(f"{type(meta_data_location[-1]["name"][0])}{type(mod_names[0])}")
                 if meta_data_location[-1]["name"][0] not in mod_names:
                     del meta_data_location[-1]
                 else:
                     # if there is a metadata file or there is a zip (which indicates that there's a zipped mod)
                     if Path(os.path.join(meta_data_location[-1]["path"][0], "meta_data.json5")).is_file() or Path(meta_data_location[-1]["path"][0]).is_file():
-                        #handeling for mods being stored as a zip
-                        # iterate through the zip find the metadata if it exsists else use fall back values
+                        # handeling for mods being stored as a zip
+                        # iterate through the zip find the metadata if it exists else use fallback values
                         if Path(meta_data_location[-1]["path"][0]).is_file():
                             archive = zipfile.ZipFile(meta_data_location[-1]["path"][0], 'r')
                             if any(x.startswith("%s/" % "meta_data.json5".rstrip("/")) for x in archive.namelist()):
                                 meta = archive.read("meta_data.json5")
                                 meta_data = json5.loads(str(meta))
-                                meta_data_location[-1] = meta_data_location[-1] | meta_data
+                                for dicts in mod_strip:
+                                    if meta_data["name"] == dicts["name"]:
+                                        for keys_dicts in dicts.keys():
+                                            for keys_meta_data in meta_data.keys():
+                                                if keys_meta_data == keys_dicts:
+                                                    mod_strip[mod_strip.index(dicts)][dicts[f"{keys_dicts}"]] = meta_data[f"{meta_data}"]
+                                                else:
+                                                    mod_strip[mod_strip.index(dicts)][dicts[f"{meta_data}"]] = meta_data[f"{meta_data}"]
+                                print(mod_strip)
+                                # combined = {}
+                                # for dicts in (meta_data, mod_strip):
+                                #     for key, value in dicts.items():
+                                #         if key in combined:
+                                #             # If it's already a list, append; if not, make it a list
+                                #             if isinstance(combined[key], list):
+                                #                 combined[key].append(value)
+                                #             else:
+                                #                 combined[key] = [combined[key], value]
+                                #         else:
+                                #             combined[key] = value
+                                # meta_data_location[-1] = combined
+                                # meta_data_location[-1] = meta_data_location[-1] | meta_data
                                 #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
                                 if "exclusive_with" not in meta_data:
                                     meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "", 0]]
@@ -233,10 +268,60 @@ def strip_useful_mod_info(data_location:str):
                                 meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "", 0 ]]
                                 meta_data_location[-1]["load_after"] = [lowest_prio]
                                 meta_data_location[-1]["load_before"] = [lowest_prio]
+                                meta_data_location[-1]["steamId"] = [lowest_prio]
                         else:
                             meta = open(os.path.join(meta_data_location[-1]["path"][0], "meta_data.json5"), "r", encoding='UTF-8').read()
                             meta_data = json5.loads(meta)
-                            meta_data_location[-1] = meta_data_location[-1] | meta_data
+                            # print(meta_data)
+                            for desc_line in open(os.path.join(meta_data_location[-1]["path"][0], "descriptor.mod"), "r", encoding='UTF-8'):
+                                if desc_line.startswith("name="):
+                                    if "name" in meta_data.keys():
+                                        if isinstance(desc_line, list):
+                                            print(meta_data["name"])
+                                            meta_data["name"].append([replace_text_func(desc_line, ['"', "\n", "name="])])
+                                        else:
+                                            meta_data["name"].append([replace_text_func(desc_line[0], ['"', "\n", "name="])])
+                                    else:
+                                        meta_data["name"] = [replace_text_func(desc_line, ['"', "\n", "name="])]
+                                if desc_line.startswith("supported_version="):
+                                    if "supported_version" in meta_data.keys():
+                                        if isinstance(meta_data["supported_version"], list):
+                                            meta_data["supported_version"][0].append([replace_text_func(desc_line, ['"', "\n", "supported_version="])])
+                                        else:
+                                            meta_data["supported_version"].append([replace_text_func(desc_line, ['"', "\n", "supported_version="])])
+                                    else:
+                                        meta_data["supported_version"] = [replace_text_func(desc_line, ['"', "\n", "supported_version="])]
+                                if desc_line.startswith("path=") or desc_line.startswith("archive="):
+                                    if "path" in meta_data.keys() or "archive" in meta_data[-1].keys():
+                                        if isinstance(meta_data["supported_version"], list):
+                                            meta_data["path"][0].append([replace_text_func(replace_text_func(desc_line, ['"', "\n", "path=", "archive="]), ["_-_"], " - ")])
+                                        else:
+                                            meta_data["path"].append([replace_text_func(replace_text_func(desc_line, ['"', "\n", "path=", "archive="]), ["_-_"], " - ")])
+                                    else:
+                                        meta_data["path"] = [replace_text_func(replace_text_func(desc_line, ['"', "\n", "path=", "archive="]), ["_-_"], " - ")]
+                                if desc_line.startswith("remote_file_id="):
+                                    if "remote_file_id" in meta_data.keys() or "remote_file_id" in meta_data.keys():
+                                        if isinstance(meta_data["supported_version"], list):
+                                            meta_data["remote_file_id"][0].append(replace_text_func(desc_line, ['"', "\n", "remote_file_id="]))
+                                        else:
+                                            meta_data["remote_file_id"].append(replace_text_func(desc_line, ['"', "\n", "remote_file_id="]))
+                                    else:
+                                        meta_data["remote_file_id"] = [replace_text_func(desc_line, ['"', "\n", "remote_file_id="])]
+                            if "path" not in meta_data_location[-1].keys():
+                                meta_data_location[-1]["path"] = [""]
+                            if "supported_version" not in meta_data_location[-1].keys():
+                                meta_data_location[-1]["supported_version"] = [""]
+                            if "name" not in meta_data_location[-1].keys():
+                                meta_data_location[-1]["name"] = [""]
+                            for dicts in mod_strip:
+                                if ( "name" in meta_data.keys() and "displayName" in dicts.keys() and meta_data["name"][0] == dicts["displayName"][0] ) or ( "remote_file_id" in meta_data.keys() and "remote_file_id" in dicts.keys() and meta_data["remote_file_id"][0] == dicts["steamId"][0] ):
+                                    for keys_dicts in dicts.keys():
+                                        for keys_meta_data in meta_data.keys():
+                                            if keys_meta_data == keys_dicts:
+                                                mod_strip[mod_strip.index(dicts)][dicts[f"{keys_dicts}"]] = meta_data[f"{meta_data}"]
+                                            else:
+                                                mod_strip[mod_strip.index(dicts)][dicts[f"{meta_data}"]] = meta_data[f"{meta_data}"]
+                            print(meta_data)
                             #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
                             if "exclusive_with" not in meta_data:
                                 meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "", 0]]
@@ -254,17 +339,17 @@ def strip_useful_mod_info(data_location:str):
                         meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "", 0]]
                         meta_data_location[-1]["load_after"] = [lowest_prio]
                         meta_data_location[-1]["load_before"] = [lowest_prio]
+                        meta_data_location[-1]["steamId"] = [lowest_prio]
+                    for mod_dict in mod_strip:
+                        if meta_data_location[-1]["name"][0] == mod_dict["displayName"]:
+                            meta_data_location[-1]["enabled"] = [mod_dict["enabled"]]
+                            meta_data_location[-1]["position"] = [mod_dict["position"]]
+                            meta_data_location[-1]["steamId"] = [mod_dict["steamId"]]
     del(meta_data_location[0])
-    # tracker = 0
-    # for meta_data in range(len(meta_data_location)):
-    #     if meta_data_location[meta_data-tracker]["name"][0] not in mod_names:
-    #         # print(meta_data_location[meta_data-tracker]["name"])
-    #         del meta_data_location[meta_data-tracker]
-    #         tracker +=1
     # print(meta_data_location)
 
 
-def output_mod_list():
+def output_mod_list_func():
     output_mod_file_loc = export_data_txtb.get()
     if output_mod_file_loc == '':
         output_mod_file_loc = load_order_loc
@@ -285,8 +370,8 @@ def output_mod_list():
     load_order_file.write(output_mod_file)
 
 
-# add ui to show dependency to download, show a single link then have button to show next increasing counter global
-def close_link_ui():
+# add ui to show dependency to download, show a single link then have button to show next increasing global counter
+def close_link_ui_func():
     global dependencies_tracker
     global mod_filtering_process
     global dependencies
@@ -315,8 +400,8 @@ def close_link_ui():
         # print(sorted_list)
 
 
-# add ui to show dependency to download, show a single link then have button to show next increasing counter global
-def skip_link_ui():
+# add ui to show dependency to download, show a single link then have button to show next increasing counter-global
+def skip_link_ui_func():
     global dependencies_tracker
     global mod_filtering_process
     global dependencies
@@ -361,7 +446,7 @@ if "__main__" == __name__:
     load_data_txtb = tk.Entry(main_menu_tbl, relief="raised")
     load_data_lbl.grid(row=8, column=0, padx=15, pady=15)
     load_data_txtb.grid(row=8, column=1)
-    load_data_submit_btn = tk.Button(main_menu_tbl, text="Submit", command= lambda :strip_useful_mod_info(data_location = load_data_txtb.get()))
+    load_data_submit_btn = tk.Button(main_menu_tbl, text="Submit", command= lambda :strip_useful_mod_info_func(data_location = load_data_txtb.get()))
     load_data_submit_btn.grid(columnspan=2)
 
     order_mods_btn = tk.Button(main_menu_tbl, text="Sort submitted mods", command=mod_ordering_func)
@@ -371,7 +456,7 @@ if "__main__" == __name__:
     export_data_txtb = tk.Entry(main_menu_tbl, relief="raised")
     export_data_lbl.grid(row=12, column=0, padx=15, pady=15)
     export_data_txtb.grid(row=12, column=1)
-    export_data_submit_btn = tk.Button(main_menu_tbl, text="Submit", command=output_mod_list)
+    export_data_submit_btn = tk.Button(main_menu_tbl, text="Submit", command=output_mod_list_func)
     export_data_submit_btn.grid(row=13, columnspan=2)
 
     reuq_action_tbl = tk.Tk()
@@ -379,9 +464,9 @@ if "__main__" == __name__:
 
     missing_mod_lbl = tk.Label(reuq_action_tbl, text=f"Mod dependencies[dependencies_tracker][0] is missing but is required by a mod in the play set")
     missing_mod_lbl.grid(row=1, column=2, padx=15, pady=15)
-    sub_to_mod_btn = tk.Button(reuq_action_tbl, text="Click here to go to mod page", command=close_link_ui)
+    sub_to_mod_btn = tk.Button(reuq_action_tbl, text="Click here to go to mod page", command=close_link_ui_func)
     sub_to_mod_btn.grid(row=2, column=1)
-    skip_sub_btn = tk.Button(reuq_action_tbl, text="Skip subscribing", command=skip_link_ui)
+    skip_sub_btn = tk.Button(reuq_action_tbl, text="Skip subscribing", command=skip_link_ui_func)
     skip_sub_btn.grid(row=2, column=2)
     #hide for later
     reuq_action_tbl.withdraw()
