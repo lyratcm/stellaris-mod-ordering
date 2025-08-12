@@ -1,21 +1,17 @@
-import ast
 import os.path
-import re
 import tkinter as tk
 import sqlite3
 import json
 from pathlib import Path
 import webbrowser
-import time
 from multiprocessing import Process
 import threading
 import json5
 import zipfile
-from collections import defaultdict
 
 
 #needs to be tracked in multiple functions trigger by buttons so not return
-load_order_loc = ""
+load_order_loc = "C:\\Users\\dan20\\OneDrive\\stellaris mod ordering\\op(for testing code)_backup.json"
 dependencies = []
 dependencies_tracker = 0
 exclusive_tracker = 0
@@ -202,11 +198,14 @@ def strip_useful_mod_info_func(data_location:str):
                             meta_data_location.append({"path":[replace_text_func(replace_text_func(desc_line, ['"', "\n", "path=", "archive="]), ["_-_"], " - ")]})
                         else:
                             meta_data_location[-1]["path"] = [replace_text_func(replace_text_func(desc_line, ['"', "\n", "path=", "archive="]), ["_-_"], " - ")]
+
                     if desc_line.startswith("remote_file_id=") or desc_line.startswith("archive="):
                         if "remote_file_id" in meta_data_location[-1].keys():
                             meta_data_location.append({"remote_file_id":[replace_text_func(desc_line, ['"', "\n", "remote_file_id="])]})
                         else:
                             meta_data_location[-1]["remote_file_id"] = [replace_text_func(desc_line, ['"', "\n", "remote_file_id="])]
+
+
                 if "path" not in meta_data_location[-1].keys():
                     meta_data_location[-1]["path"] = ["100000"]
                 if "supported_version" not in meta_data_location[-1].keys():
@@ -215,6 +214,8 @@ def strip_useful_mod_info_func(data_location:str):
                     meta_data_location[-1]["name"] = ["100000"]
                 if "remote_file_id" not in meta_data_location[-1].keys():
                     meta_data_location[-1]["remote_file_id"] = ["100000"]
+
+
                 # print(meta_data_location)
                 # print(f"{type(meta_data_location[-1]["name"][0])}{type(mod_names[0])}")
                 if meta_data_location[-1]["name"][0] not in mod_names:
@@ -269,6 +270,8 @@ def strip_useful_mod_info_func(data_location:str):
                                 meta_data_location[-1]["load_after"] = [lowest_prio]
                                 meta_data_location[-1]["load_before"] = [lowest_prio]
                                 meta_data_location[-1]["steamId"] = [lowest_prio]
+
+
                         else:
                             meta = open(os.path.join(meta_data_location[-1]["path"][0], "meta_data.json5"), "r", encoding='UTF-8').read()
                             meta_data = json5.loads(meta)
@@ -307,12 +310,16 @@ def strip_useful_mod_info_func(data_location:str):
                                             meta_data["remote_file_id"].append(replace_text_func(desc_line, ['"', "\n", "remote_file_id="]))
                                     else:
                                         meta_data["remote_file_id"] = [replace_text_func(desc_line, ['"', "\n", "remote_file_id="])]
+
+
                             if "path" not in meta_data_location[-1].keys():
                                 meta_data_location[-1]["path"] = [""]
                             if "supported_version" not in meta_data_location[-1].keys():
                                 meta_data_location[-1]["supported_version"] = [""]
                             if "name" not in meta_data_location[-1].keys():
                                 meta_data_location[-1]["name"] = [""]
+
+
                             for dicts in mod_strip:
                                 if ( "name" in meta_data.keys() and "displayName" in dicts.keys() and meta_data["name"][0] == dicts["displayName"][0] ) or ( "remote_file_id" in meta_data.keys() and "remote_file_id" in dicts.keys() and meta_data["remote_file_id"][0] == dicts["steamId"][0] ):
                                     for keys_dicts in dicts.keys():
@@ -322,6 +329,8 @@ def strip_useful_mod_info_func(data_location:str):
                                             else:
                                                 mod_strip[mod_strip.index(dicts)][dicts[f"{meta_data}"]] = meta_data[f"{meta_data}"]
                             print(meta_data)
+
+
                             #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
                             if "exclusive_with" not in meta_data:
                                 meta_data_location[-1]["exclusive_with"] = [[ lowest_prio, "", "", 0]]
@@ -340,6 +349,8 @@ def strip_useful_mod_info_func(data_location:str):
                         meta_data_location[-1]["load_after"] = [lowest_prio]
                         meta_data_location[-1]["load_before"] = [lowest_prio]
                         meta_data_location[-1]["steamId"] = [lowest_prio]
+
+
                     for mod_dict in mod_strip:
                         if meta_data_location[-1]["name"][0] == mod_dict["displayName"]:
                             meta_data_location[-1]["enabled"] = [mod_dict["enabled"]]

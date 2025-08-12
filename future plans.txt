@@ -1,6 +1,7 @@
 add opening the link in steam app
-support for linux/mac os
-add windows explorer ui to pick mod and button to pull active playset
+support for linux/macOS
+add Windows explorer ui to pick mod and button to pull active playset
+options menus allow modders to set persistent variables such as mod menu default or setting pre-game start, add into opptions mod
 turn the global variables into local ones
 ui made in vs/ better ui
 modder ui to create metamod
