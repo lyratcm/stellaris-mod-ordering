@@ -23,9 +23,9 @@ def create_table():
     db_cursor.execute('CREATE TABLE IF NOT EXISTS sortingDB(displayName TEX, enabled INTEGER, position INTEGER, steamId INTEGER PRIMARY KEY, dependency TEX, exclusive_with TEX, priority TEX, load_after TEX, load_before TEX)')
     # db_cursor.execute('CREATE TABLE IF NOT EXISTS sortingorderDB(idno INTEGER PRIMARY KEY, datestamp TEXT, firstname TEXT, surname TEXT, age INTEGER)')
 
-
+# take the mods and mod info and use them to create a default mod list, order the mods based on the info then run the ui to prompt the user
 def mod_filtering_func():
-    #recrate the conn link as tkinter doesn't allow it to be passed through
+    #recreate the conn link as tkinter doesn't allow it to be passed through
     dab_name = 'mod sorting.db'
     connection_link = sqlite3.connect(dab_name)
     global meta_data_location
@@ -92,7 +92,7 @@ def mod_filtering_func():
             print(priority_order[i])
     # print(priority_order)
 
-
+# show the mods that need fixing the missing or exclusive with mods
 def mod_ordering_func():
     global meta_data_location
     global dependencies
@@ -150,7 +150,7 @@ def replace_text_func(text, replace:list, replace_to:str = ""):
             text = text.replace(ch,replace_to )
     return text
 
-
+#take a mod list and use that to locate the mods needed and their info files to be sorted
 def strip_useful_mod_info_func(data_location:str):
     lowest_prio = 100000
     global meta_data_location
@@ -438,7 +438,7 @@ def skip_link_ui_func():
         main_menu_tbl.deiconify()
         mod_filtering_process.start()
 
-
+# set up the 2 windows one of inputting the mod file location and choosing an output location the other for fixing mod issues
 if "__main__" == __name__:
     dab_name = 'mod sorting.db'
     connection_link = sqlite3.connect(dab_name)
