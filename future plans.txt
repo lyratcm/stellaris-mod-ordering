@@ -7,3 +7,4 @@ ui made in vs/ better ui
 modder ui to create metamod
 change mod filtering to use metadata rather than mod name (the internal one should more rarely change ), have mod folder mod name, workshop file mod name and metadata mod name all be stored
 add support loading last used playlist from pdx launcher/irony
+
