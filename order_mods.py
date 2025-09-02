@@ -44,24 +44,24 @@ def mod_filtering_func():
         if 'priority' in char and char['priority'][0] != 100000:
             priority_order.append(char)
         else:
-            if any(value in char['name'] for value in last_load_letters):
+            if any(value in char['displayName'] for value in last_load_letters):
                 last_list.append(char)
-            if any(value in char['name'] for value in patch_mod_letters) and not any(value in char['name'] for value in last_load_letters):
+            if any(value in char['displayName'] for value in patch_mod_letters) and not any(value in char['displayName'] for value in last_load_letters):
                 patch_list.append(char)
-            if not any(value in char['name'] for value in last_load_letters) and not any(value in char['name'] for value in patch_mod_letters):
+            if not any(value in char['displayName'] for value in last_load_letters) and not any(value in char['displayName'] for value in patch_mod_letters):
                 main_list.append(char)
         if 'load_before' in char and char['load_before'][0] != 100000:
-            patching_needed_before.append([char['load_before'][0], char['name'], meta_data_location.index(char)])
+            patching_needed_before.append([char['load_before'][0], char['displayName'], meta_data_location.index(char)])
         if 'load_before' in char and char['load_after'][0] != 100000:
-            patching_needed_after.append([char['load_after'][0], char['name'], meta_data_location.index(char)])
+            patching_needed_after.append([char['load_after'][0], char['displayName'], meta_data_location.index(char)])
     priority_order = sorted(priority_order, key=lambda s: s['priority'][0])
     #take out the mods that should be last, that are patches and all other mods to order them
-    main_list.sort(key = lambda x: x['name'], reverse=True)
-    patch_list.sort(key = lambda x: x['name'],reverse=True)
+    main_list.sort(key = lambda x: x['displayName'], reverse=True)
+    patch_list.sort(key = lambda x: x['displayName'],reverse=True)
     for i in range(len(patch_list)):
         main_list.append(patch_list[i])
     # sort based on ! due to stellaris loading
-    last_list = sorted(last_list, key=lambda ll: ll['name'].count('!'))
+    last_list = sorted(last_list, key=lambda ll: ll['displayName'].count('!'))
     for i in range(len(last_list)):
         main_list.append(last_list[i])
     for i in range(len(main_list)):
@@ -71,14 +71,15 @@ def mod_filtering_func():
     # prio 0 is loaded last prio 100,000 is loaded first
     for patch in patching_needed_before:
         for mod in priority_order:
-            if mod["name"] == patch[0] and mod["priority"] < patch[2]:
+            mod = mod
+            if mod["displayName"] == patch[0:-2] and mod["priority"] < patch[-1]:
                 old_index = priority_order.index(mod)
                 priority_order.insert(priority_order[priority_order.index(mod)], priority_order[patch[2]])
                 del priority_order[old_index]
         # no need to take action if prio is higher as it will already be loaded before
     for patch in patching_needed_after:
         for mod in priority_order:
-            if mod["name"] == patch[0] and mod["priority"] > patch[2]:
+            if mod["displayName"] == patch[0:-2] and mod["priority"] > patch[-1]:
                 old_index = priority_order.index(mod)
                 priority_order.insert(priority_order[priority_order.index(mod)], priority_order[patch[2]])
                 del priority_order[old_index]
@@ -87,9 +88,9 @@ def mod_filtering_func():
     #make the position match the order in the list
     for i in range(len(priority_order)):
         try:
-            priority_order[i]["position"][0] = i+1
+            priority_order[i]["position"] = i+1
         except KeyError:
-            print(priority_order[i])
+            print(f"-{priority_order[i]}")
     # print(priority_order)
 
 # show the mods that need fixing the missing or exclusive with mods
