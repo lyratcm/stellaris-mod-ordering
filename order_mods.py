@@ -121,7 +121,7 @@ def mod_ordering_func():
             # break
     # # print(meta_data_location)
     # print(dependencies)
-    #broken, exlcusive not getting shown
+    #broken, exclusive not getting shown
     #try to find the mod name in the mod list so the dependency is fill and remove it from the list
     for char in meta_data_location:
         for dependant in dependencies:
