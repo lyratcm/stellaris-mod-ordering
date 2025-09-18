@@ -130,8 +130,8 @@ def mod_ordering_func():
                 # print(f"{dependant}, {char["name"]}")
                 dependencies.remove(dependant)
         for excl in exclusive:
-            # print(excl)
-            if "displayName" in char and char["displayName"][0] in excl:
+            # print(f"{excl} ----- {char["displayName"]}")
+            if "displayName" in char and char["displayName"] in excl:
                 # print(char["exclusive_with"])
                 exclusive_temp.append(excl)
     exclusive = exclusive_temp
@@ -343,7 +343,6 @@ def strip_useful_mod_info_func(data_location:str):
                             if meta_data["displayName"][-1] == ['n']:
                                 meta_data["displayName"] = meta_data["displayName"][0]
                             # print(meta_data)
-
                             #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
                             if "exclusive_with" not in meta_data:
                                 meta_data["exclusive_with"] = [[ lowest_prio, "", "", 0]]
@@ -357,11 +356,6 @@ def strip_useful_mod_info_func(data_location:str):
                                  meta_data["load_before"] = [lowest_prio]
                             # print(meta_data)
                             for dicts in mod_strip:
-                                # broken
-                                # print(f"{meta_data},{dicts}")
-                                # print(f"meta data keys: {meta_data.keys()}, dict keys: {dicts.keys()}")
-                                # print(f"metadata: {meta_data["name"][0]}, dicts: {dicts["displayName"]}")
-                                # print(f"metadata: {meta_data["remote_file_id"][0]}, dicts: {dicts["steamId"]}")
                                 if ("name" in meta_data.keys() and "displayName" in dicts.keys() and meta_data["name"][0] == dicts["displayName"] ) or ( "remote_file_id" in meta_data.keys() and "steamId" in dicts.keys() and meta_data["remote_file_id"][0] == dicts["steamId"]):
                                     # print(f"{meta_data}\n   -{dicts}")
                                     return_dict = {}
@@ -377,14 +371,7 @@ def strip_useful_mod_info_func(data_location:str):
                                             return_dict[keys_dicts] = dicts[keys_dicts]
                                         for data in meta_data:
                                             return_dict[data] = meta_data[data]
-                                            # print(f"metadata:{keys_meta_data}, key dict: {keys_dicts}")
-                                            # if keys_meta_data == keys_dicts:
-                                            #     mod_strip[mod_strip.index(dicts)][dicts[f"{keys_dicts}"]] = meta_data[f"{keys_meta_data}"]
-                                            # else:
-                                            #     mod_strip[mod_strip.index(dicts)][dicts[f"{keys_meta_data}"]] = meta_data[f"{keys_meta_data}"]
                                     mod_strip[mod_strip.index(dicts)] = return_dict
-                                    # print(return_dict)
-                            # print(mod_strip)
                             #fill the field if the mod author wasn't using them set prio to 10k as that is the value of mods that don't care about order
                         if "exclusive_with" not in mod_strip[-1]:
                             mod_strip[-1]["exclusive_with"] = [[ lowest_prio, "", "", 0]]
@@ -403,30 +390,6 @@ def strip_useful_mod_info_func(data_location:str):
                         meta_data_location[-1]["load_after"] = [lowest_prio]
                         meta_data_location[-1]["load_before"] = [lowest_prio]
 
-                    # print(f"----{meta_data_location}")
-                    # for mod_dict in mod_strip:
-                    #     # print(f"{meta_data_location[-1]["name"][0]}  {mod_dict["displayName"]}")
-                    #     if meta_data_location[-1]["name"][0] in mod_dict["displayName"]:
-                    #         meta_data_location[-1]["name"] = [mod_dict["displayName"][0:-1], meta_data_location[-1]["name"][0:-1]]
-                    #         #will only be in the mod list
-                    #         if "enabled" in meta_data_location[-1]:
-                    #             meta_data_location[-1]["enabled"] = [mod_dict["enabled"], meta_data_location[-1]["enabled"]]
-                    #         if "position" in meta_data_location[-1]:
-                    #             meta_data_location[-1]["position"] = [mod_dict["position"], meta_data_location[-1]["position"]]
-                    #         if "remote_file_id" in meta_data_location[-1]:
-                    #             meta_data_location[-1]["steamId"] = [mod_dict["steamId"][0:-1], meta_data_location[-1]["remote_file_id"][0:-1]]
-                    #         try:
-                    #             meta_data_location[-1]["priority"] = mod_dict["priority"][0:-1]
-                    #         except KeyError:
-                    #             print(meta_data_location[-1]["name"])
-                    #         try:
-                    #             meta_data_location[-1]["dependency"] = mod_dict["dependency"][0:-1]
-                    #         except KeyError:
-                    #             print(mod_dict)
-                    #         meta_data_location[-1]["exclusive_with"] = mod_dict["exclusive_with"][0:-1]
-                    #         meta_data_location[-1]["load_after"] = mod_dict["load_after"][0:-1]
-                    #         meta_data_location[-1]["load_before"] = mod_dict["load_before"][0:-1]
-                    #         meta_data_location[-1]["steamId"] = mod_dict["steamId"][0:-1]
     del(meta_data_location[0])
     for meta_data in meta_data_location:
         for dicts in mod_strip:
@@ -517,11 +480,13 @@ def skip_link_ui_func():
         exclusive_tracker -= 1
     if dependencies_tracker != 0:
         missing_mod_lbl.config(text=f"Mod {dependencies[-dependencies_tracker][0]} is missing but is required by a mod in the play set because \n {dependencies[-dependencies_tracker][2]}")
+        main_menu_tbl.title("Missing Dependency")
         # reuq_action_tbl.deiconify()
         # reuq_action_tbl.iconify()
     elif exclusive_tracker != 0:
         missing_mod_lbl.config(text=f"Mod {exclusive[-exclusive_tracker][0]} is incompatible with a mod in the play set because \n {exclusive[-exclusive_tracker][1]}")
         sub_to_mod_btn.config(text="Remove mod from playset")
+        main_menu_tbl.title("Conflicting mods")
         # reuq_action_tbl.deiconify()
         # reuq_action_tbl.iconify()
     else:
